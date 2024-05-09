@@ -383,6 +383,7 @@ pub fn main() {
         surface.resize(nonzero_size.0, nonzero_size.1).unwrap();
     }
 
+    let mut resize_pressed_prev_frame = false;
 
     event_loop.run(|event, target| {
         match event {
@@ -403,6 +404,45 @@ pub fn main() {
                     }
                     winit::event::WindowEvent::RedrawRequested => {
                         timer.response();
+
+                        'fullscreen_resize: {
+                            if input.is_key_pressed(winit::keyboard::KeyCode::F11) {
+                                if resize_pressed_prev_frame {
+                                    break 'fullscreen_resize;
+                                }
+
+                                if window.fullscreen().is_some() {
+                                    window.set_fullscreen(None);
+                                } else {
+                                    // Find perfect suitable videomode
+                                    if let Some(monitor) = window.current_monitor() {
+                                        for mode in monitor.video_modes() {
+                                            println!("{mode}");
+                                        }
+                                        let mut best_index: Option<usize> = None;
+                                        let mut best_count: Option<u32> = None;
+                                        for (index, count) in monitor.video_modes()
+                                            .enumerate()
+                                            .map(|(index, mode)|
+                                                (index, (mode.bit_depth() == 32) as u32 + ((mode.refresh_rate_millihertz() == 48000) as u32 + (mode.size() == winit::dpi::PhysicalSize::new(640, 480)) as u32 * 2))
+                                            ) {
+                                            if Some(count) > best_count {
+                                                best_count = Some(count);
+                                                best_index = Some(index);
+                                            }
+                                        }
+
+                                        if let Some(index) = best_index {
+                                            window.set_fullscreen(Some(winit::window::Fullscreen::Exclusive(monitor.video_modes().nth(index).unwrap())));
+                                        }
+                                    }
+                                }
+
+                                resize_pressed_prev_frame = true;
+                            } else {
+                                resize_pressed_prev_frame = false;
+                            }
+                        }
 
                         {
                             type KeyCode = winit::keyboard::KeyCode;
